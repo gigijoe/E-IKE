@@ -12,7 +12,7 @@
 
 #define USART_TX_DMA 1
 
-#define MAX_TX_LEN 32
+#define MAX_TX_LEN 64
 #define MAX_RX_LEN 256 // this is the maximum string length of our string in characters
 
 #define USART1_ENABLE 1
