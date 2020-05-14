@@ -1,5 +1,5 @@
 # Please add all the appropriate src files, (*.o) targets
-SRCS= delay.c usart.c main.c system_stm32f10x.c
+SRCS= delay.c usart.c eeprom.c main.c system_stm32f10x.c
 
 # all the files will be generated with this name (main.elf, main.bin, main.hex, etc)
 PROJ_NAME=main
@@ -108,7 +108,7 @@ $(PROJ_NAME).elf: $(SRCS)
 	@echo Please check $(LDSCRIPT_INC) to ensure that the linker script is correct.
 	@echo
 	@echo $(value STARTUP)
-	$(CC) $(CFLAGS) $^ -o $@ -L$(STD_PERIPH_LIB) -lstm32f1 -lm -L$(LDSCRIPT_INC)
+	$(CC) $(CFLAGS) $^ -o $@ -L$(STD_PERIPH_LIB) -lstm32f1 -lm -L$(LDSCRIPT_INC) -s
 	$(OBJCOPY) -O ihex $(PROJ_NAME).elf $(PROJ_NAME).hex
 	$(OBJCOPY) -O binary $(PROJ_NAME).elf $(PROJ_NAME).bin
 	$(OBJDUMP) -St $(PROJ_NAME).elf >$(PROJ_NAME).lst

@@ -23,7 +23,7 @@ EGS : Automatic Transmission ZF5HP24 v8.60.2 (E38/E39/E53)
 
 @ Data request interval 2 secs.
 
-@ Automatic external scanner detection.
+@ Automatic external scanner collision detection.
 
 ## Principle
 

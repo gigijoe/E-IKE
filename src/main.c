@@ -29,7 +29,6 @@
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#undef IGNITION_STATUS
 //#define DEBUG
 
 #include "stm32f10x.h"
@@ -52,13 +51,11 @@ static uint8_t currentItem = 0;
 *
 */
 
-#if 0
 static uint32_t tim4Tick_1ms = 0;
 static uint32_t tim4Tick_10ms = 0;
 static uint32_t tim4Tick_50ms = 0;
 static uint32_t tim4Tick_100ms = 0;
 static uint32_t tim4Tick_200ms = 0;
-#endif
 static uint32_t tim4Tick_1000ms = 0;
 
 static uint32_t tim4Tick = 0;
@@ -248,11 +245,11 @@ int IBus_Write2(uint8_t src, uint8_t dest, uint8_t *data, uint8_t dataLen)
   code[1] = len; 
   code[i+3] = XOR_Checksum((uint8_t *)&code[0], len + 1);
 #if 0
-  Usart2_Puts("\r\n");
-  Usart2_Printf("Source : %s\r\n", ibus_device_name(code[0]));
-  Usart2_Printf("Length : 0x%x\r\n", code[1]);
-  Usart2_Printf("Destination : %s\r\n", ibus_device_name(code[2]));
-  Usart2_Printf("CRC : %s\r\n", hextoa(code[i+3])); /* All exclude CRC itself */
+  Usart2_Puts("");
+  Usart2_Printf("\r\nSource : %s", ibus_device_name(code[0]));
+  Usart2_Printf("\r\nLength : 0x%x", code[1]);
+  Usart2_Printf("\r\nDestination : %s", ibus_device_name(code[2]));
+  Usart2_Printf("\r\nCRC : %s", hextoa(code[i+3])); /* All exclude CRC itself */
 #endif
   Usart3_Write(&code[0], len + 2);
 
@@ -333,6 +330,13 @@ int ME72_Send_224004()
   return 0;
 }
 
+int ME52_Send_0b03()
+{
+  uint8_t code[] = { 0x12, 0x05, 0x0b, 0x03, 0x1f };
+  KBus_Write(&code[0], 5);
+  return 0;
+}
+
 int IKE_Send_80048480()
 {
   uint8_t code[] = { 0x80, 0x04, 0x00, 0x84 };
@@ -381,8 +385,8 @@ void DBus_DecodeIke(const uint8_t *p)
 {
   if(p[1] == 0x12) {
 #if 0
-    Usart2_Printf("Part number %x%x%x%x\r\n", p[3] & 0x0f, p[4], p[5], p[6]);
-    snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "PN %x%x%x%x\r\n", p[3] & 0x0f, p[4], p[5], p[6]);
+    Usart2_Printf("\r\nPart number %x%x%x%x", p[3] & 0x0f, p[4], p[5], p[6]);
+    snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "\r\nPN %x%x%x%x", p[3] & 0x0f, p[4], p[5], p[6]);
     IBus_RedrawIkeScreen(ikeDisplay);
 #endif
   }
@@ -404,8 +408,32 @@ void DBus_DecodeEgs(const uint8_t *p)
   }
 }
 
-#define endian_swap16(x) \
+#if 0
+/*
+#define sl16_to_host(x) \
   ((((x)>>8) & 0x00ff) | (((x)<<8) & 0xff00))
+*/
+int16_t
+sl16_to_host(const uint8_t b[2])
+{
+    unsigned int n = ((unsigned int)b[1]) | (((unsigned int)b[0]) << 8);
+    return (int16_t)n;
+}
+
+#else
+
+int16_t
+sl16_to_host(const uint8_t b[2])
+{
+    unsigned int n = ((unsigned int)b[1]) | (((unsigned int)b[0]) << 8);
+    int v = n;
+    if (n & 0x8000) {
+        v -= 0x10000;
+    }
+    return (int16_t)v;
+}
+
+#endif
 
 #if 0
 const char coolantTemp[] = "Coolant Temp";
@@ -421,24 +449,15 @@ const char engRpm[] = "Engine RPM";
 const char adaptAdd[] = "Add";
 const char adaptMulti[] = "Multi";
 
-int16_t
-sl16_to_host(const uint8_t b[2])
-{
-    unsigned int n = ((unsigned int)b[1]) | (((unsigned int)b[0]) << 8);
-    int v = n;
-    if (n & 0x8000) {
-        v -= 0x10000;
-    }
-    return (int16_t)v;
-}
+/*
+#
+# KWP2000 - [Format][Target][Source][Length][ServiceID][Data 1][Data 2]...[Data n][Checksum]
+#
+*/
 
-void DBus_DecodeDme(const uint8_t *p)
+void DBus_DecodeKwp2000(const uint8_t *p)
 {
-  if(p[1] == 0xf1 && p[2] == 0x12) {
-    uint16_t *t = 0;
-    int16_t *a = 0;
-    int16_t *b = 0;
-
+  if(p[1] == 0xf1 && p[2] == 0x12) { /* from DME to f1 */
     switch(currentItem) {
 #if 0
       case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8);
@@ -452,20 +471,15 @@ void DBus_DecodeDme(const uint8_t *p)
       case 3: break;
       case 4: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", intakeTemp, (int)p[21] * 3 / 4 - 48, 0xa8);
         break;
-      case 5: t = (uint16_t *)&p[25];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fkg/h", airMass, endian_swap16(*t) * 0.1);
+      case 5: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fkg/h", airMass, sl16_to_host(&p[25]) * 0.1);
         break;
       case 6: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fV", batVoltage, p[29] * 0.095);
         break;
-      case 7: t = (uint16_t *)&p[27]; 
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%%", engLoad, endian_swap16(*t) * 0.0015259);
+      case 7: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%%", engLoad, sl16_to_host(&p[27]) * 0.0015259);
         break; 
-      case 8: t = (uint16_t *)&p[14];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d", engRpm, endian_swap16(*t) >> 2);
+      case 8: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d", engRpm, sl16_to_host(&p[14]) >> 2);
         break;
-      case 9: a = (int16_t *)&p[7];
-        b = (int16_t *)&p[9];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptAdd, endian_swap16(*a) * 0.046875, endian_swap16(*b) * 0.046875);
+      case 9: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptAdd, sl16_to_host(&p[7]) * 0.046875, sl16_to_host(&p[9]) * 0.046875);
         break;
 #if 0        
       case 10: a = (int16_t *)&p[11];
@@ -486,19 +500,33 @@ void DBus_DecodeDme(const uint8_t *p)
   }
 }
 
+void DBus_DecodeDme(const uint8_t *p)
+{
+    switch(currentItem) {
+      case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolantTemp, (int)p[25] * 3 / 4 - 48, 0xa8);
+        break;
+      case 4: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", intakeTemp, (int)p[24] * 3 / 4 - 48, 0xa8);
+        break;
+      case 5: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fkg/h", airMass, sl16_to_host(&p[2]) * 0.25);
+        break;
+      case 6: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fV", batVoltage, p[31] * 0.094309);
+        break;
+      case 9: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f %.2f ms", adaptAdd, sl16_to_host(&p[12]) * 0.0000625, sl16_to_host(&p[14]) * 0.0000625);
+        break;
+      case 10: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptMulti, sl16_to_host(&p[16]) * 0.000030518, sl16_to_host(&p[18]) * 0.000030518);
+        break;
+      default:
+        return;
+    }
+    IBus_RedrawIkeScreen(ikeDisplay);
+#ifdef DEBUG    
+    Usart2_Printf(ikeDisplay);
+#endif
+}
+
 /*
 *
 */
-
-#ifdef IGNITION_STATUS
-
-#define IGN_OFF 0x00
-#define IGN_ACC 0x01
-#define IGN_POS2 0x02
-
-uint8_t ignStatus = IGN_OFF;
-
-#endif
 
 void DBus_Request(void)
 {
@@ -519,7 +547,11 @@ void DBus_Request(void)
   GPIO_SetBits(GPIOB, GPIO_Pin_12);  // turn off all led
 }
 
-#ifdef IGNITION_STATUS
+#define IGN_OFF 0x00
+#define IGN_ACC 0x01
+#define IGN_POS2 0x02
+
+uint8_t ignStatus = IGN_OFF;
 
 void IBus_IgnitionRequest(void)
 {
@@ -530,8 +562,6 @@ void IBus_IgnitionRequest(void)
 
   GPIO_SetBits(GPIOB, GPIO_Pin_12);  // turn off all led
 }
-
-#endif
 
 /*
 *
@@ -544,26 +574,23 @@ void IBus_DecodeIke(const uint8_t *p)
   if(p[2] == 0xbf) { /* GLO */
     switch(p[3]) { /* Message ID */
       case 0x11: { /* ignition status */
-#if 0
 /*
 Bit 1 = KL_R (Pos1_Acc)
 Bit 2 = KL_15 (Pos2_On)
 Bit 3 = KL_50 (Pos3_Start)
 */
-#endif
-#ifdef IGNITION_STATUS
         ignStatus = p[4];
 #ifdef DEBUG
+        Usart2_Printf("\r\nIgnition ");
         if(ignStatus == IGN_OFF)
-          Usart2_Printf("\r\nIgn Off\r\n");
+          Usart2_Printf("OFF");
         else if(ignStatus == IGN_ACC)
-          Usart2_Printf("\r\nIgn Pos1_Acc\r\n");
+          Usart2_Printf("POS1_ACC");
         else if(ignStatus == (IGN_ACC | IGN_POS2))
-          Usart2_Printf("\r\nIgn Pos1_Acc Pos2_On\r\n");
+          Usart2_Printf("POS1_ACC POS2_ON");
         else
-          Usart2_Printf("\r\nIgn Unknown\r\n");
+          Usart2_Printf("Unknown");
 #endif      
-#endif
       } break;
       case 0x18: { /* Speed & RPM */
 /*
@@ -593,7 +620,7 @@ void IBus_DecodeRad(uint8_t *p)
       bRadioOn = true;
   }
 #if 1
-  Usart2_Printf("\r\nRadio Power %s\r\n", bRadioOn ? "On" : "Off");
+  Usart2_Printf("\r\nRadio Power %s", bRadioOn ? "On" : "Off");
 #endif
 }
 
@@ -612,7 +639,7 @@ void IBus_DecodeRad(uint8_t *p)
       bRadioOn = true;
   }
 #if 1
-  Usart2_Printf("\r\nRadio Power %s\r\n", bRadioOn ? "On" : "Off");
+  Usart2_Printf("\r\nRadio Power %s", bRadioOn ? "On" : "Off");
 #endif
 }
 
@@ -620,11 +647,7 @@ void IBus_DecodeRad(uint8_t *p)
 
 void CurrentItem_Update()
 {
-#ifdef IGNITION_STATUS
-  if(currentItem >= MAX_ITEMS || (ignStatus != (IGN_ACC | IGN_POS2)))
-#else
   if(currentItem >= MAX_ITEMS)
-#endif
     currentItem = 0;
 
   switch(currentItem) {
@@ -680,6 +703,9 @@ void Btn_RT_Telephone()
   CurrentItem_Update();
 }
 
+#define FACELIFE_1999
+#undef FACELIFE_2000
+
 void IBus_DecodeMfl(const uint8_t *p)
 { 
   const uint8_t BTN_NEXT_PRESSED[] = { 0x3b, 0x01, 0x06 };
@@ -691,8 +717,14 @@ void IBus_DecodeMfl(const uint8_t *p)
   const uint8_t BTN_VOLUME_UP[] = { 0x32, 0x11, 0x1f };
   const uint8_t BTN_VOLUME_DOWN[] = { 0x32, 0x10, 0x1e };
 
+#ifdef FACELIFE_1999
+  const uint8_t BTN_RT_TELEPHONE_ON[] = { 0x3b, 0x80, 0x27 };
+  const uint8_t BTN_RT_TELEPHONE_OFF[] = { 0x3b, 0xa0, 0x07 };
+#endif
+#ifdef FACELIFE_2000
   const uint8_t BTN_RT_TELEPHONE_ON[] = { 0x3b, 0x40, 0xe7 };
   const uint8_t BTN_RT_TELEPHONE_OFF[] = { 0x3b, 0x00, 0xa7 };
+#endif
 
   const uint8_t BTN_TELEPHONE_PRESSED[] = { 0x3b, 0x80, 0x27 };
   const uint8_t BTN_TELEPHONE_KEEP_PRESSED[] = { 0x3b, 0x90, 0x37 };
@@ -713,7 +745,7 @@ void IBus_DecodeMfl(const uint8_t *p)
       if(memcmp(BTN_RT_TELEPHONE_ON, &p[3], 3) == 0) {
         Btn_RT_Telephone();
       } else if(memcmp(BTN_RT_TELEPHONE_OFF, &p[3], 3) == 0) {
-        Btn_RT_Telephone();
+        //Btn_RT_Telephone();
       } else if(memcmp(BTN_TELEPHONE_PRESSED, &p[3], 3) == 0) {
       } else if(memcmp(BTN_TELEPHONE_KEEP_PRESSED, &p[3], 3) == 0) {
       } else if(memcmp(BTN_TELEPHONE_RELEASED, &p[3], 3) == 0) {
@@ -745,7 +777,7 @@ void IBus_DecodeMid(uint8_t *p)
           case 12: break;
         }
       } else { /* Button pressed */
-//Usart2_Printf("\r\nRadio button %d pressed\r\n", p[6] & 0x0f);
+//Usart2_Printf("\r\nRadio button %d pressed", p[6] & 0x0f);
         switch(p[6] & 0x0f) {
           case 0: break;
           case 1: break;
@@ -764,6 +796,80 @@ void IBus_DecodeMid(uint8_t *p)
       }
     }
   }
+}
+
+/*
+*
+*/
+
+#define MAX_ID_COUNT 4
+static uint8_t srcIdCount = 0;
+static uint8_t srcId[MAX_ID_COUNT];
+static uint8_t destIdCount = 0;
+static uint8_t destId[MAX_ID_COUNT];
+typedef enum {ibusStop, ibusScan} IBusScanState;
+static IBusScanState state = ibusStop;
+
+int IBus_SetupSource(int argc, char *argv[])
+{
+  int i;
+  srcIdCount = 0;
+  memset(srcId, 0, MAX_ID_COUNT);
+  for(i=1;i<argc;i++) {
+    srcId[i-1] = atohex(argv[i]);
+    if(++srcIdCount >= MAX_ID_COUNT)
+      break;
+  }
+  return 0;
+}
+
+int IBus_SetupDestination(int argc, char *argv[])
+{
+  int i;
+  destIdCount = 0;
+  memset(destId, 0, MAX_ID_COUNT);
+  for(i=1;i<argc;i++) {
+    destId[i-1] = atohex(argv[i]);
+    if(++destIdCount >= MAX_ID_COUNT)
+      break;
+  }
+  return 0;
+}
+
+int IBus_StartScan(int argc, char *argv[])
+{
+  state = ibusScan;
+  return 0;
+}
+
+int IBus_StopScan(int argc, char *argv[])
+{
+  state = ibusStop;
+  return 0;
+}
+
+IBusScanState IBus_State() { return state; }
+
+uint8_t IBus_ValidSource(uint8_t id)
+{
+  int i;
+  if(srcIdCount == 0)
+    return id;
+  for(i=0;i<srcIdCount;i++)
+    if(srcId[i] == id)
+      return id;
+  return 0;
+}
+
+uint8_t IBus_ValidDestination(uint8_t id)
+{
+  int i;
+  if(destIdCount == 0)
+    return id;
+  for(i=0;i<destIdCount;i++)
+    if(destId[i] == id)
+      return id;
+  return 0;
 }
 
 /*
@@ -845,7 +951,28 @@ int Shell_Run(Shell *s)
       break;
   }
 
-  if(argc >= 2 && strcmp("scan", argv[0]) == 0) {
+  if(strcmp("help", argv[0]) == 0) {
+    Usart2_Puts("\r\n ibus src [dev id 0] [dev id 1] ... [dev id n]");
+    Usart2_Puts("\r\n ibus dest [dev id 0] [dev id 1] ... [dev id n]");
+    Usart2_Puts("\r\n ibus scan");
+    Usart2_Puts("\r\n ibus stop");
+    Usart2_Puts("\r\n scan [ike | egs | dme]");
+    Usart2_Puts("\r\n btn [rt | next | prev]");
+    Usart2_Puts("\r\n status");
+    Usart2_Puts("\r\n ignition");
+    Usart2_Puts("\r\n time [hour] [minute]");
+    Usart2_Puts("\r\n date [day] [month] [year]");
+    ret = 0;
+  } else if(strcmp("ibus", argv[0]) == 0) {
+    if(strcmp("src", argv[1]) == 0)
+      ret = IBus_SetupSource(argc, argv);
+    else if(argc >= 3 && strcmp("dest", argv[1]) == 0)
+      ret = IBus_SetupDestination(argc, argv);
+    else if(argc >= 2 && strcmp("scan", argv[1]) == 0)
+      ret = IBus_StartScan(argc, argv);
+    else if(strcmp("stop", argv[1]) == 0)
+      ret = IBus_StopScan(argc, argv);    
+  } else if(argc >= 2 && strcmp("scan", argv[0]) == 0) {
     if(strcmp("ike", argv[1]) == 0)
       ret = IKE_Send_80048480();
       //ret = IKE_CheckTroubleCode();    
@@ -865,8 +992,11 @@ int Shell_Run(Shell *s)
       ret = 0;
     }
   } else if(strcmp("status", argv[0]) == 0) {
-    Usart2_Printf("Speed %d km/h, %d RPM\r\n", speed, rpm);
-    Usart2_Printf("\r\nRadio Power %s\r\n", bRadioOn ? "On" : "Off");
+    Usart2_Printf("\r\nSpeed %d km/h, %d RPM", speed, rpm);
+    Usart2_Printf("\r\nRadio Power %s", bRadioOn ? "On" : "Off");
+    ret = 0;
+  } else if(strcmp("ignition", argv[0]) == 0) {
+    IBus_IgnitionRequest();
     ret = 0;
   } else if(argc >= 3 && strcmp("time", argv[0]) == 0) {
     IBus_SetTime(atodec(argv[1]), atodec(argv[2])); /* hour, minute */
@@ -939,7 +1069,6 @@ void Tim4_Enable(void)
 {
   TIM_Cmd(TIM4, ENABLE);
 }
-#if 0
 
 void Tim4_1ms(void)
 {
@@ -960,25 +1089,25 @@ void Tim4_100ms(void)
 void Tim4_200ms(void)
 {
 }
-#endif
+
 void Tim4_1000ms(void)
 {
-#if 0  
+#if 0 /* IKE character self test */
   static uint8_t c = 0x0;
   char str[5];
   snprintf(str, 5, "%s%c", hextoa(c), c);
   IBus_RedrawIkeScreen(str);
   c++;
 #endif
-#ifdef IGNITION_STATUS
-  static uint8_t counter = 0;
-  if(counter++ >= 10) {
-    IBus_IgnitionRequest();
-    counter = 0;
+/*
+  if(tim4Tick_1000ms % 5 == 0) {
+    Btn_Next_Released();
+  }  
+*/
+  if(tim4Tick_1000ms == 3) { /* Show log ONLY after 3 secs of power on */
+    IBus_RedrawIkeScreen("BMW E38 Individual");
   }
-#endif
 }
-
 
 /**
   * @brief  Main program.
@@ -994,6 +1123,12 @@ int main(void)
        system_stm32f10x.c file
      */     
   
+  /* Enable Prefetch Buffer */
+  FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
+
+  /* Flash 2 wait state */
+  FLASH_SetLatency(FLASH_Latency_2);
+
   delay_init(72); /* 72 MHz system clock */
 
   /* GPIOB Periph clock enable */
@@ -1023,115 +1158,17 @@ int main(void)
   Pwm1_Reverse();
   Pwm1_Pulse(0);
 #endif
+  /* Unlock the Flash Program Erase controller */
+  FLASH_Unlock();
+  EE_Init();
 
+#ifdef USART2_ENABLE
   Usart2_Init(115200);
-  Usart2_Puts("\r\nKBus\\> ");
-
-  while(1) {
-#if 0
-    /* K-Line KWP 2000 fast initialization */
-    USART_DeInit(USART1);
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(25);
-    GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(25);
-    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(25);
-
-    Usart1_Init(10400); /* D-Bus operates at a rate of 9.6 Kbps */
- 
-    uint8_t initialization_code[] = { 0xC1, 0x33, 0xF1, 0x81, 0x66 };
-    Usart1_Write(&initialization_code[0], 5);
-
-    delay_ms(1200);
-
-    int len = Usart1_Poll();
-    if(len > 0) {
-      char *p = Usart1_Gets();
-      Usart2_Puts("\r\n");
-      int i;
-      for(i=0;i<len;i++) {
-          Usart2_Write((uint8_t *)hextoa(p[i]), 2);
-          Usart2_Write((uint8_t *)" ", 1);
-      }
-      Usart2_Puts("\r\n");          
-      Usart2_Puts("KWP2000 fast init okay\r\n");
-      USART_DeInit(USART1);
-      break;
-    } else
-      Usart2_Puts("KWP2000 fast init failure\r\n");
-
-    /* K-Line slow initialization KWP 2000 or ISO 9141-2 */
-    USART_DeInit(USART1);
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-
-    delay_ms(2600); //2,6s delay before attempting 5 baud init
-
-    /* ISO 9141 with 5-baud initialization. starts with a 200ms low, 400ms high/low/high/low, 227ms high */
-    GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(200);
-    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(400);
-    GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(400);
-    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(400);
-    GPIO_ResetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(400);
-    GPIO_SetBits(GPIOA, GPIO_Pin_9);
-    delay_ms(227);
-
-    Usart1_Init(10400); /* D-Bus operates at a rate of 9.6 Kbps */
-    bool use_iso9141 = false;
-    len = Usart1_Poll3(3 /*desired length*/, 500 /*timeout ms*/);
-    if(len == 3) {
-      char *p = Usart1_Gets();
-      if(p[0] == 0x55){ //first response byte must always be 0x55
-        if((p[1] == 0x08 && p[2] == 0x08) ||
-          (p[1] == 0x94 && p[2] == 0x94)) //if both KB1 and KB2 are 0x08 or 0x94 then use ISO 9141-2
-          use_iso9141 = true;
-
-        p[2] = ~p[2];
-        Usart1_Write(&p[2], 1);  //reply with inverted KB2
-        len = Usart1_Poll3(1 /*desired length*/, 100 /*timeout ms*/);
-        if(len == 1) {
-          if(use_iso9141)
-            Usart2_Puts("ISO9141 slow init okay\r\n");
-          else
-            Usart2_Puts("KWP slow init okay\r\n");
-          USART_DeInit(USART1);
-          break;
-        }
-      }
-    }
-
-    Usart2_Puts("Slow init failure\r\n");
-    USART_DeInit(USART1);
+  Usart2_Puts("\r\nE-IKE\\> ");
 #endif
-    break;
-  }
-
+#ifdef USART1_ENABLE
   Usart1_Init(9600); /* D-Bus operates at a rate of 9.6 Kbps */
+#endif
 #ifdef USART3_ENABLE
   Usart3_Init(9600); /* I-Bus operates at a rate of 9.6 Kbps */
 #endif
@@ -1139,24 +1176,29 @@ int main(void)
   Tim4_Init();
   Tim4_Enable();
 
-#if 0
   uint32_t tick_1ms = tim4Tick_1ms;
   uint32_t tick_10ms = tim4Tick_10ms;
   uint32_t tick_50ms = tim4Tick_50ms;
   uint32_t tick_100ms = tim4Tick_100ms;  
   uint32_t tick_200ms = tim4Tick_200ms;
-#endif
   uint32_t tick_1000ms = tim4Tick_1000ms;
 
   e_ike_tick = tim4Tick + e_ike_interval; /* Restore */
+#if 0
+  int16_t a = 1;
+  int16_t b = -1;
 
+  a = sl16_to_host((uint8_t *)&a);
+  b = sl16_to_host((uint8_t *)&b);
+
+  Usart2_Printf("XXX %.2f%% %.2f%%", sl16_to_host((uint8_t *)&a) * 0.046875, sl16_to_host((uint8_t *)&b) * 0.046875);
+#endif
   /* To achieve GPIO toggling maximum frequency, the following  sequence is mandatory. 
      You can monitor PD0 or PD2 on the scope to measure the output signal. 
      If you need to fine tune this frequency, you can add more GPIO set/reset 
      cycles to minimize more the infinite loop timing.
      This code needs to be compiled with high speed optimization option.  */
-  for(;;) {
-#if 0    
+  for(;;) {   
     if(tick_1ms != tim4Tick_1ms) {
       tick_1ms = tim4Tick_1ms;
       Tim4_1ms();
@@ -1181,7 +1223,7 @@ int main(void)
       tick_200ms = tim4Tick_200ms;
       Tim4_200ms();
     }
-#endif
+
     if(tick_1000ms != tim4Tick_1000ms) {
       tick_1000ms = tim4Tick_1000ms;
       Tim4_1000ms();
@@ -1193,22 +1235,18 @@ int main(void)
     } else if(e_ike_tick > tim4Tick && e_ike_tick - tim4Tick > 0xffffff) { /* timer tick over flow */
       e_ike_tick = tim4Tick + e_ike_interval; /* Restore */      
     }
-    
+
+#ifdef USART2_ENABLE    
     int len = Usart2_Poll();
     if(len > 0) {
-      uint8_t *p = (uint8_t *)Usart2_Gets();
-#if 1      
+      uint8_t *p = (uint8_t *)Usart2_Gets();      
       int i;
       for(i=0;i<len;i++) {
         if(p[i] == 0xd) { /* CR */
-          char *sc = Shell_InputString(&shell);
-          if(sc)
-            if(Shell_Run(&shell) == -1)
-              Usart2_Puts("\r\nIllegal command\r\nKBus\\> ");
-            else
-              Usart2_Puts("\r\nKBus\\> ");
+          if(Shell_InputString(&shell) && Shell_Run(&shell) == -1)
+            Usart2_Puts("\r\nIllegal command\r\nE-IKE\\> ");
           else
-            Usart2_Puts("\r\nKBus\\> ");
+            Usart2_Puts("\r\nE-IKE\\> ");
         } else if((p[i] >= 0x20 && p[i] <= 0x7e) || p[i] == 0x8) {
           if(p[i] == 0x8) /*backspace */
             Usart2_Puts("\b \b"); /* backspace + space + backspace */
@@ -1217,9 +1255,8 @@ int main(void)
           Shell_Input(&shell, p[i]);
         }
       }
-#endif      
     }
-
+#endif
 #ifdef USART3_ENABLE
     len = Usart3_Poll();
 /*    
@@ -1228,8 +1265,32 @@ int main(void)
 */
     if(len > 0) {
       char *p = Usart3_Gets();
-#ifdef DEBUG
-      Usart2_Puts("<IBus>\r\n");
+
+      switch(p[0]) { /* src */
+        case 0x50: /* MFL Multi Functional Steering Wheel Buttons */
+          IBus_DecodeMfl(&p[0]);
+          break;
+        case 0x80: /* IKE Instrument Control Electronics */
+          IBus_DecodeIke(&p[0]);
+          break;
+        case 0x68: /* Radio */
+          IBus_DecodeRad(&p[0]);
+          break;
+        case 0xc0: /* Multi-info display */
+          IBus_DecodeMid(&p[0]);
+          break;
+      }
+
+      if(IBus_State() == ibusStop)
+        continue;
+
+      if(p[0] != IBus_ValidSource(p[0]) ||
+        p[2] != IBus_ValidDestination(p[2]))
+        continue;
+
+      //Usart2_Puts("\r\n");
+
+      Usart2_Puts("\r\n");
       int i;
       for(i=0;i<len;i++) {
         Usart2_Write((uint8_t *)hextoa(p[i]), 2);
@@ -1245,22 +1306,6 @@ int main(void)
         else
           Usart2_Write((uint8_t *)&p[i], 1);
       }
-      Usart2_Puts("\r\n");
-#endif
-      switch(p[0]) { /* src */
-        case 0x50: /* MFL Multi Functional Steering Wheel Buttons */
-          IBus_DecodeMfl(&p[0]);
-          break;
-        case 0x80: /* IKE Instrument Control Electronics */
-          IBus_DecodeIke(&p[0]);
-          break;
-        case 0x68: /* Radio */
-          IBus_DecodeRad(&p[0]);
-          break;
-        case 0xc0: /* Multi-info display */
-          IBus_DecodeMid(&p[0]);
-          break;
-      }
     }
 #endif
 
@@ -1274,13 +1319,12 @@ int main(void)
       char *p = Usart1_Gets();
 #ifdef DEBUG
       Usart2_Puts("<KBus>\r\n");
-
+      //Usart2_Puts("\r\n");
       int i;
       for(i=0;i<len;i++) {
         Usart2_Write((uint8_t *)hextoa(p[i]), 2);
         Usart2_Write((uint8_t *)" ", 1);
-      }
-      Usart2_Puts("\r\n");
+      } 
 #endif
       if((p[0] == 0xb8 && p[1] == 0x12 && p[2] == 0xf1) ||
         (p[1] == 0x04 && p[2] == 0x00)) { /* D-Bus busy */
@@ -1295,7 +1339,9 @@ int main(void)
             DBus_DecodeIke(&p[0]);
             break;
           case 0xb8: /* DME */
-            DBus_DecodeDme(&p[0]);
+            DBus_DecodeKwp2000(&p[0]);
+            break;
+          case 0x12: /* DME */
             break;
         }
       }
@@ -1330,7 +1376,7 @@ void TIM4_IRQHandler(void)
 {
   if(TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET) {
     tim4Tick++;
-#if 0    
+    
     tim4Tick_1ms++;
     if(tim4Tick % 10 == 0)
       tim4Tick_10ms++;
@@ -1339,8 +1385,7 @@ void TIM4_IRQHandler(void)
     if(tim4Tick % 100 == 0)
       tim4Tick_100ms++;
     if(tim4Tick % 200 == 0)
-      tim4Tick_200ms++;
-#endif            
+      tim4Tick_200ms++;            
     if(tim4Tick % 1000 == 0)
       tim4Tick_1000ms++;
 
