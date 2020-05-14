@@ -500,30 +500,6 @@ void DBus_DecodeKwp2000(const uint8_t *p)
   }
 }
 
-void DBus_DecodeDme(const uint8_t *p)
-{
-    switch(currentItem) {
-      case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolantTemp, (int)p[25] * 3 / 4 - 48, 0xa8);
-        break;
-      case 4: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", intakeTemp, (int)p[24] * 3 / 4 - 48, 0xa8);
-        break;
-      case 5: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fkg/h", airMass, sl16_to_host(&p[2]) * 0.25);
-        break;
-      case 6: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fV", batVoltage, p[31] * 0.094309);
-        break;
-      case 9: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f %.2f ms", adaptAdd, sl16_to_host(&p[12]) * 0.0000625, sl16_to_host(&p[14]) * 0.0000625);
-        break;
-      case 10: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptMulti, sl16_to_host(&p[16]) * 0.000030518, sl16_to_host(&p[18]) * 0.000030518);
-        break;
-      default:
-        return;
-    }
-    IBus_RedrawIkeScreen(ikeDisplay);
-#ifdef DEBUG    
-    Usart2_Printf(ikeDisplay);
-#endif
-}
-
 /*
 *
 */
