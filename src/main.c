@@ -407,7 +407,11 @@ void DBus_DecodeEgs(const uint8_t *p)
 #define endian_swap16(x) \
   ((((x)>>8) & 0x00ff) | (((x)<<8) & 0xff00))
 
+#if 0
 const char coolantTemp[] = "Coolant Temp";
+#else
+const char coolantTemp[] = "C Temp";
+#endif
 const char coolOutTemp[] = "Cool Out Temp";
 const char intakeTemp[] = "Intake Temp";
 const char airMass[] = "Air Mass";
@@ -417,6 +421,17 @@ const char engRpm[] = "Engine RPM";
 const char adaptAdd[] = "Add";
 const char adaptMulti[] = "Multi";
 
+int16_t
+sl16_to_host(const uint8_t b[2])
+{
+    unsigned int n = ((unsigned int)b[1]) | (((unsigned int)b[0]) << 8);
+    int v = n;
+    if (n & 0x8000) {
+        v -= 0x10000;
+    }
+    return (int16_t)v;
+}
+
 void DBus_DecodeDme(const uint8_t *p)
 {
   if(p[1] == 0xf1 && p[2] == 0x12) {
@@ -425,8 +440,13 @@ void DBus_DecodeDme(const uint8_t *p)
     int16_t *b = 0;
 
     switch(currentItem) {
+#if 0
       case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8);
         break;
+#else
+      case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC / %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8, (int)p[32] * 3 / 4 - 48, 0xa8);
+        break;
+#endif
       case 2: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolOutTemp, (int)p[32] * 3 / 4 - 48, 0xa8);
         break;
       case 3: break;
@@ -447,9 +467,14 @@ void DBus_DecodeDme(const uint8_t *p)
         b = (int16_t *)&p[9];
         snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptAdd, endian_swap16(*a) * 0.046875, endian_swap16(*b) * 0.046875);
         break;
+#if 0        
       case 10: a = (int16_t *)&p[11];
         b = (int16_t *)&p[13];
         snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptMulti, endian_swap16(*a) * 0.0000305, endian_swap16(*b) * 0.0000305);
+#else
+      case 10: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.1f%% %.1f%%", adaptMulti, 100.0f + (sl16_to_host(&p[11]) * 0.00305), 100.0f + (sl16_to_host(&p[13]) * 0.00305));
+        break;
+#endif
         break;
       default:
         return;

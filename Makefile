@@ -82,6 +82,9 @@ OPTIMIZE       = -Os
 
 CFLAGS	= $(MCFLAGS)  $(OPTIMIZE)  $(DEFS) -I. -I./ $(STM32_INCLUDES)
 CFLAGS += -lc -lnosys -specs=nosys.specs -Wl,-Map=$(PROJ_NAME).map -Wl,-T,stm32_flash.ld
+CFLAGS += -Wl,--gc-sections -specs=nano.specs
+CFLAGS += -fno-common -mfloat-abi=soft -fsingle-precision-constant -fomit-frame-pointer -ffunction-sections -fdata-sections
+
 AFLAGS	= $(MCFLAGS) 
 
 SRCS += stm32f10x_it.c 
