@@ -1,5 +1,5 @@
 # Please add all the appropriate src files, (*.o) targets
-SRCS= delay.c usart.c eeprom.c main.c system_stm32f10x.c
+SRCS= delay.c usart.c main.c system_stm32f10x.c
 
 # all the files will be generated with this name (main.elf, main.bin, main.hex, etc)
 PROJ_NAME=main
@@ -84,6 +84,7 @@ CFLAGS	= $(MCFLAGS)  $(OPTIMIZE)  $(DEFS) -I. -I./ $(STM32_INCLUDES)
 CFLAGS += -lc -lnosys -specs=nosys.specs -Wl,-Map=$(PROJ_NAME).map -Wl,-T,stm32_flash.ld
 CFLAGS += -Wl,--gc-sections -specs=nano.specs
 CFLAGS += -fno-common -mfloat-abi=soft -fsingle-precision-constant -fomit-frame-pointer -ffunction-sections -fdata-sections
+CFLAGS += -u _printf_float
 
 AFLAGS	= $(MCFLAGS) 
 
@@ -108,7 +109,7 @@ $(PROJ_NAME).elf: $(SRCS)
 	@echo Please check $(LDSCRIPT_INC) to ensure that the linker script is correct.
 	@echo
 	@echo $(value STARTUP)
-	$(CC) $(CFLAGS) $^ -o $@ -L$(STD_PERIPH_LIB) -lstm32f1 -lm -L$(LDSCRIPT_INC) -s
+	$(CC) $(CFLAGS) $^ -o $@ -L$(STD_PERIPH_LIB) -lstm32f1 -lm -L$(LDSCRIPT_INC)
 	$(OBJCOPY) -O ihex $(PROJ_NAME).elf $(PROJ_NAME).hex
 	$(OBJCOPY) -O binary $(PROJ_NAME).elf $(PROJ_NAME).bin
 	$(OBJDUMP) -St $(PROJ_NAME).elf >$(PROJ_NAME).lst
@@ -123,5 +124,8 @@ clean:
 	rm -f $(PROJ_NAME).map
 	rm -f $(PROJ_NAME).lst
 
-reallyclean: clean
+distclean: clean
 	$(MAKE) -C $(STD_PERIPH_LIB) clean
+
+flash:
+	@st-flash write $(PROJ_NAME).bin 0x8000000
