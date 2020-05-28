@@ -2,22 +2,25 @@
 
 ## Supports
 
-DME : Bosch Motronic v7.2 (M62TU) - KWP2000 protocol
-EGS : Automatic Transmission ZF5HP24 v8.60.2 (E38/E39/E53)
+* DME : Bosch Motronic v7.2 (M62TU) - KWP2000 protocol
+* EGS : Automatic Transmission ZF5HP24 v8.60.2 (E38/E39/E53)
 
 ## Functions
 
 @ Display the following information
-1.Coolant temperature.
-2.Coolant outlet temperature.
-3.Transmission temperature.
-4.Intake air temperature.
-5.Intake air mass flow.
-6.Battery voltage.
-7.Engine RPM.
-8.Engine load.
-9.Fuel trim additive.
-10.Fuel trum multiplicative.
+1. Coolant temperature.
+2. Coolant outlet temperature.
+3. Transmission temperature.
+4. Intake air temperature.
+5. Intake air mass flow.
+6. Battery voltage.
+7. Engine RPM.
+8. Engine load.
+9. Fuel trim additive.
+10. Fuel trum multiplicative.
+11. Fuel Injection time
+12. CAM position
+13. Engine smoothness
 
 @ Display switch by steering wheel buttons NEXT / PREV or RT_TELEPHONE.
 
