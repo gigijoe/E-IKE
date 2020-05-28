@@ -36,6 +36,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdarg.h>
 
 #include "bool.h"
 #include "delay.h"
@@ -44,9 +45,6 @@
 #include "adc.h"
 #include "pwm.h"
 #endif
-
-#define MAX_ITEMS 11
-static uint8_t currentItem = 0;
 
 /*
 *
@@ -259,6 +257,8 @@ int IBus_Write2(uint8_t src, uint8_t dest, uint8_t *data, uint8_t dataLen)
   return 0;
 }
 
+#if 0
+
 #define MAX_IKE_SCREEN_LENGTH 20
 
 void IBus_RedrawIkeScreen(const char *text)
@@ -280,6 +280,164 @@ void IBus_RedrawIkeScreen(const char *text)
   memcpy(p + frontPorch, text, len);
 
   IBus_Write2(0x68, 0x80, d, 4+MAX_IKE_SCREEN_LENGTH+1); /* Display "12345678901234567890" on IKE - Text Screen (20) */
+}
+
+#endif
+
+void IBus_RedrawIkeScreen(const char *fmt, ...)
+{
+#define MAX_IKE_SCREEN_LENGTH 20
+  uint8_t d[] = { 0x23, 0x62, 0x30, 0x00, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x04 };
+
+  if(fmt == 0) {
+    IBus_Write2(0x68, 0x80, d, 4+MAX_IKE_SCREEN_LENGTH+1); /* Clear IKE screen */
+    return;
+  }
+
+  char str[MAX_IKE_SCREEN_LENGTH+1];
+  va_list args;
+
+  va_start(args, fmt);
+  vsnprintf(str, MAX_IKE_SCREEN_LENGTH, fmt, args);
+
+#ifdef USART2_ENABLE    
+  Usart2_Printf(str);
+#endif
+
+  uint8_t len = strlen(str);
+
+  if(len <= 0) {
+    IBus_Write2(0x68, 0x80, d, 4+MAX_IKE_SCREEN_LENGTH+1); /* Clear IKE screen */
+    return;
+  }
+
+  if(len > MAX_IKE_SCREEN_LENGTH)
+    len = MAX_IKE_SCREEN_LENGTH;
+
+  uint8_t *p = &d[4];
+  uint8_t frontPorch = (MAX_IKE_SCREEN_LENGTH - len) >> 1; /* To centralize display text */
+  memcpy(p + frontPorch, str, len);
+
+  IBus_Write2(0x68, 0x80, d, 4+MAX_IKE_SCREEN_LENGTH+1); /* Display "12345678901234567890" on IKE - Text Screen (20) */
+
+  va_end(args);
+}
+
+void IBus_RedrawRadioScreen(const char *fmt, ...)
+{
+#define MAX_RADIO_SCREEN_LENGTH 11
+  uint8_t d[] = { 0x23, 0x00, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x04 };
+
+  if(fmt == 0) {
+    IBus_Write2(0x68, 0xe7, d, 3+MAX_RADIO_SCREEN_LENGTH+1);
+    return;
+  }
+
+  char str[MAX_RADIO_SCREEN_LENGTH+1];
+  va_list args;
+
+  va_start(args, fmt);
+  vsnprintf(str, MAX_RADIO_SCREEN_LENGTH, fmt, args);
+
+#ifdef USART2_ENABLE    
+  Usart2_Printf(str);
+#endif
+
+  uint8_t len = strlen(str);
+
+  if(len <= 0) {
+    IBus_Write2(0x68, 0xe7, d, 3+MAX_RADIO_SCREEN_LENGTH+1);
+    return;
+  }
+
+  if(len > MAX_RADIO_SCREEN_LENGTH)
+    len = MAX_RADIO_SCREEN_LENGTH;
+
+  memcpy(&d[3], str, len);
+  IBus_Write2(0x68, 0xe7, d, 3+MAX_RADIO_SCREEN_LENGTH+1); /* Display on ANZV OBC TextBar */
+
+  va_end(args);
+}
+
+void IBus_RedrawBcScreen(const char *fmt, ...)
+{
+#define MAX_BC_SCREEN_LENGTH 20
+
+  uint8_t d[] = { 0x23, 0x01, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x04 };
+  if(fmt == 0) {
+    IBus_Write2(0x80, 0xe7, d, 3+MAX_BC_SCREEN_LENGTH+1);
+    return;
+  }
+
+  char str[MAX_BC_SCREEN_LENGTH+1];
+  va_list args;
+
+  va_start(args, fmt);
+  vsnprintf(str, MAX_BC_SCREEN_LENGTH, fmt, args);
+
+#ifdef USART2_ENABLE    
+  Usart2_Printf(str);
+#endif
+
+  uint8_t len = strlen(str);
+
+  if(len <= 0) {
+    IBus_Write2(0x80, 0xe7, d, 3+MAX_BC_SCREEN_LENGTH+1);
+    return;
+  }
+
+  if(len > MAX_BC_SCREEN_LENGTH)
+    len = MAX_BC_SCREEN_LENGTH;
+
+  memcpy(&d[3], str, len);
+
+  IBus_Write2(0x80, 0xe7, d, 3+MAX_BC_SCREEN_LENGTH+1);
+
+  va_end(args);
+}
+
+void IBus_RedrawLeftMenuScreen(const char *s)
+{
+/* 
+21 c0 00 60  X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 
+*/
+}
+
+void IBus_RedrawRightMenuScreen(const char *s)
+{
+/* 
+21 c0 00 06  X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 
+*/
+}
+
+void IBus_RedrawLeftMenuScreen2(const char *name, uint8_t index, float f0, float f1, float f2, float f3)
+{
+/* 
+21 c0 00 60  X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 
+*/
+  char str[40];
+  str[0] = 0x21;
+  str[1] = 0xc0;
+  str[2] = 0x00;
+  str[3] = 0x60;
+  snprintf(&str[4], 36, "%s\x05%d\x05%2.1f\x05%2.1f\x05%2.1f\x05%2.1f", name, index, f0, f1, f2, f3);
+
+  IBus_Write2(0x68, 0xc0, (uint8_t *)str, 4 + strlen(&str[4]));
+}
+
+void IBus_RedrawRightMenuScreen2(const char *name, uint8_t index, float f0, float f1, float f2, float f3)
+{
+/* 
+21 c0 00 06  X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 
+*/
+  char str[40];
+  str[0] = 0x21;
+  str[1] = 0xc0;
+  str[2] = 0x00;
+  str[3] = 0x06;
+  snprintf(&str[4], 36, "%s\x05%d\x05%2.1f\x05%2.1f\x05%2.1f\x05%2.1f", name, index, f0, f1, f2, f3);
+
+  IBus_Write2(0x68, 0xc0, (uint8_t *)str, 4 + strlen(&str[4]));
 }
 
 void IBus_SetTime(uint8_t hour, uint8_t minute)
@@ -312,28 +470,35 @@ int KBus_Write(uint8_t *c, uint8_t len)
   }
 }
 
-int GS8602_Send_0b03()
+int GS8602_Send_0x0b03()
 {
   uint8_t code[] = { 0x32, 0x05, 0x0b, 0x03, 0x3f };
   KBus_Write(&code[0], 5);
   return 0;
 }
 
-int ME72_Send_224000()
+int ME72_Send_0x224000()
 {
   uint8_t code[] = { 0xb8, 0x12, 0xf1, 0x03, 0x22, 0x40, 0x00, 0x3a };
   KBus_Write(&code[0], 8);
   return 0;
 }
 
-int ME72_Send_224004()
+int ME72_Send_0x224003()
+{
+  uint8_t code[] = { 0xb8, 0x12, 0xf1, 0x03, 0x22, 0x40, 0x03, 0x3d };
+  KBus_Write(&code[0], 8);
+  return 0;
+}
+
+int ME72_Send_0x224004()
 {
   uint8_t code[] = { 0xb8, 0x12, 0xf1, 0x03, 0x22, 0x40, 0x04, 0x3e };
   KBus_Write(&code[0], 8);
   return 0;
 }
 
-int IKE_Send_80048480()
+int IKE_Send_0x80048480()
 {
   uint8_t code[] = { 0x80, 0x04, 0x00, 0x84 };
   KBus_Write(&code[0], 4);
@@ -375,37 +540,8 @@ int EWS_Init()
 *
 */
 
-uint8_t ikeDisplay[MAX_IKE_SCREEN_LENGTH];
-
-void DBus_DecodeIke(const uint8_t *p)
-{
-  if(p[1] == 0x12) {
-#if 0
-    Usart2_Printf("Part number %x%x%x%x\r\n", p[3] & 0x0f, p[4], p[5], p[6]);
-    snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "PN %x%x%x%x\r\n", p[3] & 0x0f, p[4], p[5], p[6]);
-    IBus_RedrawIkeScreen(ikeDisplay);
-#endif
-  }
-}
-
-const char transTemp[] = "Trans Temp";
-
-void DBus_DecodeEgs(const uint8_t *p)
-{
-  if(p[1] == 0x1c) {
-    switch(currentItem) {
-      case 3: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", transTemp, p[9] - 56, 0xa8);
-        break;
-    }
-    IBus_RedrawIkeScreen(ikeDisplay);
-#ifdef DEBUG    
-    Usart2_Printf(ikeDisplay);
-#endif
-  }
-}
-
-#define endian_swap16(x) \
-  ((((x)>>8) & 0x00ff) | (((x)<<8) & 0xff00))
+#define MAX_SCREEN_ITEMS 14
+static uint8_t currentItem = 0;
 
 #if 0
 const char coolantTemp[] = "Coolant Temp";
@@ -420,9 +556,33 @@ const char engLoad[] = "Engine Load";
 const char engRpm[] = "Engine RPM";
 const char adaptAdd[] = "Add";
 const char adaptMulti[] = "Multi";
+const char injectionTime[] = "Injection";
+const char camPosition[] = "Cam Pos";
+const char smoothness[] = "Smoothness";
 
-int16_t
-sl16_to_host(const uint8_t b[2])
+void DBus_DecodeIke(const uint8_t *p)
+{
+  if(p[1] == 0x12) {
+#if 0
+    Usart2_Printf("Part number %x%x%x%x\r\n", p[3] & 0x0f, p[4], p[5], p[6]);
+    IBus_RedrawIkeScreen(MAX_IKE_SCREEN_LENGTH, "PN %x%x%x%x\r\n", p[3] & 0x0f, p[4], p[5], p[6]);
+#endif
+  }
+}
+
+const char transTemp[] = "Trans Temp";
+
+void DBus_DecodeEgs(const uint8_t *p)
+{
+  if(p[1] == 0x1c) {
+    switch(currentItem) {
+      case 3: IBus_RedrawIkeScreen("%s %d%cC", transTemp, p[9] - 56, 0xa8);
+        break;
+    }
+  }
+}
+
+int16_t sl16_to_host(const uint8_t b[2])
 {
     unsigned int n = ((unsigned int)b[1]) | (((unsigned int)b[0]) << 8);
     int v = n;
@@ -432,57 +592,82 @@ sl16_to_host(const uint8_t b[2])
     return (int16_t)v;
 }
 
+#if 0
+#define endian_swap16(x) \
+  ((((x)>>8) & 0x00ff) | (((x)<<8) & 0xff00))
+#endif
+
+uint16_t endian_swap16(const uint8_t b[2]) 
+{
+  uint16_t *t = (uint16_t *)&b[0];
+  uint16_t x = *t;
+  return ((((x)>>8) & 0x00ff) | (((x)<<8) & 0xff00));
+}
+
 void DBus_DecodeDme(const uint8_t *p)
 {
   if(p[1] == 0xf1 && p[2] == 0x12) {
-    uint16_t *t = 0;
-    int16_t *a = 0;
-    int16_t *b = 0;
-
     switch(currentItem) {
 #if 0
-      case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8);
+      case 1: IBus_RedrawIkeScreen(MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8);
         break;
 #else
-      case 1: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC / %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8, (int)p[32] * 3 / 4 - 48, 0xa8);
+      case 1: IBus_RedrawIkeScreen("%s %d%cC / %d%cC", coolantTemp, (int)p[22] * 3 / 4 - 48, 0xa8, (int)p[32] * 3 / 4 - 48, 0xa8);
         break;
 #endif
-      case 2: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", coolOutTemp, (int)p[32] * 3 / 4 - 48, 0xa8);
+      case 2: IBus_RedrawIkeScreen("%s %d%cC", coolOutTemp, (int)p[32] * 3 / 4 - 48, 0xa8);
         break;
-      case 3: break;
-      case 4: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d%cC", intakeTemp, (int)p[21] * 3 / 4 - 48, 0xa8);
+      case 3: 
         break;
-      case 5: t = (uint16_t *)&p[25];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fkg/h", airMass, endian_swap16(*t) * 0.1);
+      case 4: IBus_RedrawIkeScreen("%s %d%cC", intakeTemp, (int)p[21] * 3 / 4 - 48, 0xa8);
         break;
-      case 6: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2fV", batVoltage, p[29] * 0.095);
+      case 5: IBus_RedrawIkeScreen("%s %.2fkg/h", airMass, endian_swap16(&p[25]) * 0.1);
         break;
-      case 7: t = (uint16_t *)&p[27]; 
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%%", engLoad, endian_swap16(*t) * 0.0015259);
+      case 6: IBus_RedrawIkeScreen("%s %.2fV", batVoltage, p[29] * 0.095);
+        break;
+      case 7: IBus_RedrawIkeScreen("%s %.2f%%", engLoad, endian_swap16(&p[27]) * 0.0015259);
         break; 
-      case 8: t = (uint16_t *)&p[14];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %d", engRpm, endian_swap16(*t) >> 2);
+      case 8: IBus_RedrawIkeScreen("%s %d", engRpm, endian_swap16(&p[14]) >> 2);
         break;
-      case 9: a = (int16_t *)&p[7];
-        b = (int16_t *)&p[9];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptAdd, endian_swap16(*a) * 0.046875, endian_swap16(*b) * 0.046875);
+      case 9: IBus_RedrawIkeScreen("%s %.2f%% %.2f%%", adaptAdd, endian_swap16(&p[7]) * 0.046875, endian_swap16(&p[9]) * 0.046875);
         break;
-#if 0        
-      case 10: a = (int16_t *)&p[11];
-        b = (int16_t *)&p[13];
-        snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.2f%% %.2f%%", adaptMulti, endian_swap16(*a) * 0.0000305, endian_swap16(*b) * 0.0000305);
-#else
-      case 10: snprintf(ikeDisplay, MAX_IKE_SCREEN_LENGTH, "%s %.1f%% %.1f%%", adaptMulti, (sl16_to_host(&p[11]) * 0.00305), (sl16_to_host(&p[13]) * 0.00305));
+      case 10: { 
+          float l, r;
+          l = (sl16_to_host(&p[11]) * 0.00305);
+          r = (sl16_to_host(&p[13]) * 0.00305);
+          if(l > 0)
+            l = 100.0f - l;
+          else if(l < 0)
+            l = 100.0f + l;
+          if(r > 0)
+            r = 100.0f - r;
+          else if(r < 0)
+            r = 100.0f + r;
+          IBus_RedrawIkeScreen("%s %.1f%% %.1f%%", adaptMulti, l, r);
+        } break;
+      case 11: IBus_RedrawIkeScreen("%s %.1fms", injectionTime, endian_swap16(&p[7]) * 0.016);
         break;
-#endif
+      case 12: IBus_RedrawIkeScreen("%s %.1f%c %.1f%c", camPosition, endian_swap16(&p[17]) * 0.0039, 0xa8, endian_swap16(&p[19]) * 0.0039, 0xa8);
         break;
+      case 13: {
+          float cyl[8];
+          cyl[0] = endian_swap16(&p[7]) * 0.0027756;
+          cyl[1] = endian_swap16(&p[9]) * 0.0027756;
+          cyl[2] = endian_swap16(&p[11]) * 0.0027756;
+          cyl[3] = endian_swap16(&p[13]) * 0.0027756;
+          cyl[4] = endian_swap16(&p[15]) * 0.0027756;
+          cyl[5] = endian_swap16(&p[17]) * 0.0027756;
+          cyl[6] = endian_swap16(&p[19]) * 0.0027756;
+          cyl[7] = endian_swap16(&p[21]) * 0.0027756;
+
+          IBus_RedrawLeftMenuScreen2("Bank", 1, cyl[0], cyl[1], cyl[2], cyl[3]);
+          IBus_RedrawRightMenuScreen2("Bank", 2, cyl[4], cyl[5], cyl[6], cyl[7]);
+
+          IBus_RedrawIkeScreen(smoothness); 
+      } break;
       default:
         return;
     }
-    IBus_RedrawIkeScreen(ikeDisplay);
-#ifdef DEBUG    
-    Usart2_Printf(ikeDisplay);
-#endif
   }
 }
 
@@ -502,21 +687,31 @@ uint8_t ignStatus = IGN_OFF;
 
 void DBus_Request(void)
 {
-  GPIO_ResetBits(GPIOB, GPIO_Pin_12);  // turn on all led
-
   switch(currentItem) {
     case 0: 
       break;
-    case 3: GS8602_Send_0b03();
+    case 1:
+    case 2: ME72_Send_0x224000();
+      break;
+    case 3: GS8602_Send_0x0b03();
+      break;
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8: ME72_Send_0x224000();
       break;
     case 9:
-    case 10: ME72_Send_224004();
+    case 10: ME72_Send_0x224004();
       break;
-    default: ME72_Send_224000();
+    case 11:
+    case 12: ME72_Send_0x224000();
+      break;
+    case 13: ME72_Send_0x224003();
+      break;
+    default:
       break;
   }
-
-  GPIO_SetBits(GPIOB, GPIO_Pin_12);  // turn off all led
 }
 
 #ifdef IGNITION_STATUS
@@ -618,16 +813,9 @@ void IBus_DecodeRad(uint8_t *p)
 
 #endif
 
-void CurrentItem_Update()
+void ScreenTitleUpdate(uint8_t item)
 {
-#ifdef IGNITION_STATUS
-  if(currentItem >= MAX_ITEMS || (ignStatus != (IGN_ACC | IGN_POS2)))
-#else
-  if(currentItem >= MAX_ITEMS)
-#endif
-    currentItem = 0;
-
-  switch(currentItem) {
+  switch(item) {
       case 1: IBus_RedrawIkeScreen(coolantTemp);
         break;
       case 2: IBus_RedrawIkeScreen(coolOutTemp);
@@ -648,6 +836,12 @@ void CurrentItem_Update()
         break;
       case 10: IBus_RedrawIkeScreen(adaptMulti);
         break;
+      case 11: IBus_RedrawIkeScreen(injectionTime);
+        break;
+      case 12: IBus_RedrawIkeScreen(camPosition);
+        break;
+      case 13: IBus_RedrawIkeScreen(smoothness);
+        break;
       default: IBus_RedrawIkeScreen("Enhanced-IKE Off");
         e_ike_tick = tim4Tick + e_ike_interval;
         return;
@@ -659,7 +853,10 @@ void Btn_Next_Released()
   if(bRadioOn == true)
     return;
   currentItem++;
-  CurrentItem_Update();
+  if(currentItem >= MAX_SCREEN_ITEMS)
+    currentItem = 0;
+
+  ScreenTitleUpdate(currentItem);
 }
 
 void Btn_Prev_Released()
@@ -668,16 +865,18 @@ void Btn_Prev_Released()
     return;
   if(currentItem > 0)
     currentItem--;
-  else if(currentItem == 0)
-    currentItem = MAX_ITEMS - 1;
+  else
+    currentItem = MAX_SCREEN_ITEMS - 1;
 
-  CurrentItem_Update();
+  ScreenTitleUpdate(currentItem);
 }
 
 void Btn_RT_Telephone()
 {
   currentItem++;
-  CurrentItem_Update();
+  if(currentItem >= MAX_SCREEN_ITEMS)
+    currentItem = 0;
+  ScreenTitleUpdate(currentItem);
 }
 
 void IBus_DecodeMfl(const uint8_t *p)
@@ -847,12 +1046,12 @@ int Shell_Run(Shell *s)
 
   if(argc >= 2 && strcmp("scan", argv[0]) == 0) {
     if(strcmp("ike", argv[1]) == 0)
-      ret = IKE_Send_80048480();
+      ret = IKE_Send_0x80048480();
       //ret = IKE_CheckTroubleCode();    
     else if(strcmp("egs", argv[1]) == 0)
-      ret = GS8602_Send_0b03();
+      ret = GS8602_Send_0x0b03();
     else if(strcmp("dme", argv[1]) == 0)
-      ret = ME72_Send_224000();
+      ret = ME72_Send_0x224000();
   } else if(argc >= 2 && strcmp("btn", argv[0]) == 0) {
     if(strcmp("rt", argv[1]) == 0) {
       Btn_RT_Telephone();
@@ -977,6 +1176,13 @@ void Tim4_1000ms(void)
     counter = 0;
   }
 #endif
+
+  static uint8_t tick = 0;
+
+  if(tick++ % 2 == 0)
+    GPIO_ResetBits(GPIOB, GPIO_Pin_12);  // turn on all led
+  else
+    GPIO_SetBits(GPIOB, GPIO_Pin_12);  // turn off all led
 }
 
 
