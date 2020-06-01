@@ -410,7 +410,7 @@ void IBus_RedrawRightMenuScreen(const char *s)
 */
 }
 
-void IBus_RedrawLeftMenuScreen2(const char *name, uint8_t index, float f0, float f1, float f2, float f3)
+void IBus_RedrawLeftMenuScreen2(const char *name, const char *cyls, float f0, float f1, float f2, float f3)
 {
 /* 
 21 c0 00 60  X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 
@@ -420,12 +420,12 @@ void IBus_RedrawLeftMenuScreen2(const char *name, uint8_t index, float f0, float
   str[1] = 0xc0;
   str[2] = 0x00;
   str[3] = 0x60;
-  snprintf(&str[4], 36, "%s\x05%d\x05%2.1f\x05%2.1f\x05%2.1f\x05%2.1f", name, index, f0, f1, f2, f3);
+  snprintf(&str[4], 36, "%s\x05%s\x05%1.1f\x05%1.1f\x05%1.1f\x05%1.1f", name, cyls, f0, f1, f2, f3);
 
   IBus_Write2(0x68, 0xc0, (uint8_t *)str, 4 + strlen(&str[4]));
 }
 
-void IBus_RedrawRightMenuScreen2(const char *name, uint8_t index, float f0, float f1, float f2, float f3)
+void IBus_RedrawRightMenuScreen2(const char *name, const char *cyls, float f0, float f1, float f2, float f3)
 {
 /* 
 21 c0 00 06  X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 05 X X X X 
@@ -435,7 +435,7 @@ void IBus_RedrawRightMenuScreen2(const char *name, uint8_t index, float f0, floa
   str[1] = 0xc0;
   str[2] = 0x00;
   str[3] = 0x06;
-  snprintf(&str[4], 36, "%s\x05%d\x05%2.1f\x05%2.1f\x05%2.1f\x05%2.1f", name, index, f0, f1, f2, f3);
+  snprintf(&str[4], 36, "%s\x05%s\x05%1.1f\x05%1.1f\x05%1.1f\x05%1.1f", name, cyls, f0, f1, f2, f3);
 
   IBus_Write2(0x68, 0xc0, (uint8_t *)str, 4 + strlen(&str[4]));
 }
@@ -486,7 +486,7 @@ int ME72_Send_0x224000()
 
 int ME72_Send_0x224003()
 {
-  uint8_t code[] = { 0xb8, 0x12, 0xf1, 0x03, 0x22, 0x40, 0x03, 0x3d };
+  uint8_t code[] = { 0xb8, 0x12, 0xf1, 0x03, 0x22, 0x40, 0x03, 0x39 };
   KBus_Write(&code[0], 8);
   return 0;
 }
@@ -629,7 +629,7 @@ void DBus_DecodeDme(const uint8_t *p)
         break; 
       case 8: IBus_RedrawIkeScreen("%s %d", engRpm, endian_swap16(&p[14]) >> 2);
         break;
-      case 9: IBus_RedrawIkeScreen("%s %.2f%% %.2f%%", adaptAdd, endian_swap16(&p[7]) * 0.046875, endian_swap16(&p[9]) * 0.046875);
+      case 9: IBus_RedrawIkeScreen("%s %.2f%% %.2f%%", adaptAdd, sl16_to_host(&p[7]) * 0.046875, sl16_to_host(&p[9]) * 0.046875);
         break;
       case 10: { 
           float l, r;
@@ -647,22 +647,23 @@ void DBus_DecodeDme(const uint8_t *p)
         } break;
       case 11: IBus_RedrawIkeScreen("%s %.1fms", injectionTime, endian_swap16(&p[7]) * 0.016);
         break;
-      case 12: IBus_RedrawIkeScreen("%s %.1f%c %.1f%c", camPosition, endian_swap16(&p[17]) * 0.0039, 0xa8, endian_swap16(&p[19]) * 0.0039, 0xa8);
+      case 12: IBus_RedrawIkeScreen("%s %.1f%c %.1f%c", camPosition, sl16_to_host(&p[17]) * 0.0039, 0xa8, sl16_to_host(&p[19]) * 0.0039, 0xa8);
         break;
       case 13: {
           float cyl[8];
-          cyl[0] = endian_swap16(&p[7]) * 0.0027756;
-          cyl[1] = endian_swap16(&p[9]) * 0.0027756;
-          cyl[2] = endian_swap16(&p[11]) * 0.0027756;
-          cyl[3] = endian_swap16(&p[13]) * 0.0027756;
-          cyl[4] = endian_swap16(&p[15]) * 0.0027756;
-          cyl[5] = endian_swap16(&p[17]) * 0.0027756;
-          cyl[6] = endian_swap16(&p[19]) * 0.0027756;
-          cyl[7] = endian_swap16(&p[21]) * 0.0027756;
+          cyl[0] = sl16_to_host(&p[7]) * 0.0027756;
+          cyl[1] = sl16_to_host(&p[9]) * 0.0027756;
+          cyl[2] = sl16_to_host(&p[11]) * 0.0027756;
+          cyl[3] = sl16_to_host(&p[13]) * 0.0027756;
+          cyl[4] = sl16_to_host(&p[15]) * 0.0027756;
+          cyl[5] = sl16_to_host(&p[17]) * 0.0027756;
+          cyl[6] = sl16_to_host(&p[19]) * 0.0027756;
+          cyl[7] = sl16_to_host(&p[21]) * 0.0027756;
 
-          IBus_RedrawLeftMenuScreen2("Bank", 1, cyl[0], cyl[1], cyl[2], cyl[3]);
-          IBus_RedrawRightMenuScreen2("Bank", 2, cyl[4], cyl[5], cyl[6], cyl[7]);
-
+          IBus_RedrawLeftMenuScreen2("Cyl", "5~8", cyl[4], cyl[5], cyl[6], cyl[7]);
+          delay_ms(100);
+          IBus_RedrawRightMenuScreen2("Cyl", "1~4", cyl[0], cyl[1], cyl[2], cyl[3]);
+          delay_ms(100);
           IBus_RedrawIkeScreen(smoothness); 
       } break;
       default:
